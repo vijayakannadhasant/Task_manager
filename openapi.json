@@ -1,0 +1,608 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Library Book Reservation System API",
+    "description": "Production-ready FastAPI service managing book inventories, concurrency-safe reservations with automatic 7-day expiration, and cancellation logic with inventory restoration.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/books/": {
+      "get": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Retrieve all books",
+        "description": "List all books in the catalog along with up-to-date available copies. Automatically processes expired reservations before returning counts.",
+        "operationId": "list_books",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BookResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Books"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Add a new book",
+        "description": "Create a new book with specified title, author, and total copies.",
+        "operationId": "create_book",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/books/{book_id}": {
+      "get": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Retrieve book details",
+        "description": "Retrieve details of a specific book by ID, including current available copies.",
+        "operationId": "get_book",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Unique integer ID of the book",
+              "title": "Book Id"
+            },
+            "description": "Unique integer ID of the book"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Book not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/books/{book_id}/reserve": {
+      "post": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Reserve a book copy",
+        "description": "Reserve an available copy of a book for a named user. Decrements available copies by 1. Expires after 7 days.",
+        "operationId": "reserve_book",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Unique integer ID of the book",
+              "title": "Book Id"
+            },
+            "description": "Unique integer ID of the book"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReservationCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No copies available or invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Book not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reservations/": {
+      "get": {
+        "tags": [
+          "Reservations"
+        ],
+        "summary": "List all reservations",
+        "description": "Retrieve all reservations with optional filtering by status (active, cancelled, expired) or book_id. Automatically updates expired statuses.",
+        "operationId": "list_reservations",
+        "parameters": [
+          {
+            "name": "book_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional book ID filter",
+              "title": "Book Id"
+            },
+            "description": "Optional book ID filter"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional status filter: active, cancelled, expired",
+              "title": "Status"
+            },
+            "description": "Optional status filter: active, cancelled, expired"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReservationResponse"
+                  },
+                  "title": "Response List Reservations"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reservations/{reservation_id}": {
+      "delete": {
+        "tags": [
+          "Reservations"
+        ],
+        "summary": "Cancel a reservation",
+        "description": "Cancel an active reservation. Restores exactly 1 copy to the book's inventory. Fails if already cancelled or expired.",
+        "operationId": "cancel_reservation",
+        "parameters": [
+          {
+            "name": "reservation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Unique integer ID of the reservation",
+              "title": "Reservation Id"
+            },
+            "description": "Unique integer ID of the reservation"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Reservation is already cancelled or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Reservation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Health check",
+        "description": "Health check endpoint to verify backend service liveness.",
+        "operationId": "health_check",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Root service info",
+        "description": "Root info redirecting users to docs.",
+        "operationId": "root_info",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BookCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Title",
+            "description": "Title of the book"
+          },
+          "author": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Author",
+            "description": "Author of the book"
+          },
+          "total_copies": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Total Copies",
+            "description": "Total number of copies (must be greater than 0)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "author",
+          "total_copies"
+        ],
+        "title": "BookCreate"
+      },
+      "BookResponse": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Title",
+            "description": "Title of the book"
+          },
+          "author": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Author",
+            "description": "Author of the book"
+          },
+          "total_copies": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Total Copies",
+            "description": "Total number of copies (must be greater than 0)"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Unique ID of the book"
+          },
+          "available_copies": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Available Copies",
+            "description": "Number of currently available copies"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "author",
+          "total_copies",
+          "id",
+          "available_copies"
+        ],
+        "title": "BookResponse"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "Detailed description of the error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ReservationCreate": {
+        "properties": {
+          "user_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "User Name",
+            "description": "Username of the person reserving the book"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_name"
+        ],
+        "title": "ReservationCreate"
+      },
+      "ReservationResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Unique ID of the reservation"
+          },
+          "book_id": {
+            "type": "integer",
+            "title": "Book Id",
+            "description": "ID of the reserved book"
+          },
+          "book_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Book Title",
+            "description": "Title of the reserved book"
+          },
+          "user_name": {
+            "type": "string",
+            "title": "User Name",
+            "description": "Username of the reserver"
+          },
+          "reservation_date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Reservation Date",
+            "description": "UTC timestamp when reservation was created"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At",
+            "description": "UTC timestamp when reservation expires"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Status of reservation: 'active', 'cancelled', or 'expired'"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "book_id",
+          "user_name",
+          "reservation_date",
+          "expires_at",
+          "status"
+        ],
+        "title": "ReservationResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
